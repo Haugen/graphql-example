@@ -1,48 +1,33 @@
 import fs from "fs";
 import path from "path";
 import { ApolloServer } from "apollo-server";
+import { PrismaClient } from "@prisma/client";
 
-const links = [
-  {
-    id: 1,
-    url: "https://ogac.io/",
-    description: "OGAC",
-  },
-  {
-    id: 2,
-    url: "https://ogac.io/",
-    description: "OGAC",
-  },
-];
+import { getUserId } from "./src/utils";
+import * as Query from "./src/resolvers/Query";
+import * as Mutation from "./src/resolvers/Mutation";
+import * as User from "./src/resolvers/User";
+import * as Link from "./src/resolvers/Link";
+
+const prisma = new PrismaClient();
 
 const resolvers = {
-  Query: {
-    info: () => "This is the API of a GraphQL backend practice project",
-    feed: () => links,
-    link: (_: any, args: any) => links.find((item) => item.id == args.id),
-  },
-  Mutation: {
-    postLink: (_: any, { description, url }: any) => {
-      const id = links.length + 1;
-      const link = {
-        id,
-        description,
-        url,
-      };
-      links.push(link);
-      return link;
-    },
-  },
-  Link: {
-    id: (parent: any) => parent.id,
-    description: (parent: any) => parent.description,
-    url: (parent: any) => parent.url,
-  },
+  Query,
+  Mutation,
+  User,
+  Link,
 };
 
 const server = new ApolloServer({
   typeDefs: fs.readFileSync(path.join(__dirname, "src/schema.graphql"), "utf8"),
   resolvers,
+  context: ({ req }) => {
+    return {
+      ...req,
+      prisma: prisma as PrismaClient,
+      userId: req && req.headers.authorization ? getUserId(req) : null,
+    };
+  },
 });
 
 server.listen().then(({ url }) => console.log(`Server running on ${url}`));
