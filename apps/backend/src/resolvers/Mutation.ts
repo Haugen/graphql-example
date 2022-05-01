@@ -2,7 +2,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-import { APP_SECRET, getUserId } from "../utils";
+import { APP_SECRET } from "../utils";
 
 const signup = async (parent, args, context, info) => {
   const password = await bcrypt.hash(args.password, 10);
@@ -48,4 +48,31 @@ const postLink = async (parent, args, context, info) => {
   return newLink;
 };
 
-export { signup, login, postLink };
+const vote = async (parent, args, context, info) => {
+  const userId = context.userId;
+  const vote = await context.prisma.vote.findUnique({
+    where: {
+      linkId_userId: {
+        linkId: Number(args.linkId),
+        userId: userId,
+      },
+    },
+  });
+
+  if (Boolean(vote)) {
+    throw new Error(`Already voted for link: ${args.linkId}`);
+  }
+
+  const newVote = await context.prisma.vote.create({
+    data: {
+      user: { connect: { id: userId } },
+      link: { connect: { id: Number(args.linkId) } },
+    },
+  });
+
+  context.pubSub.publish("NEW_VOTE", newVote);
+
+  return newVote;
+};
+
+export { signup, login, postLink, vote };
